@@ -1,14 +1,127 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Send Anonymous Message</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MBBS Anonymous</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Send a message to <span id="usernameDisplay"></span></h1>
-  <textarea id="messageBox" placeholder="Write your message..."></textarea><br>
-  <button onclick="sendMessage()">Send</button>
-  <script type="module" src="script.js"></script>
+  <h1>💬 MBBS Anonymous</h1>
+
+  <form id="msgForm">
+    <textarea id="msgInput" placeholder="Drop your anonymous 👀" required></textarea>
+    <button type="submit">Send 🚀</button>
+  </form>
+
+  <div id="wall">
+    <h2>🌍 Anonymous Wall</h2>
+    <div id="messages"></div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      addDoc,
+      serverTimestamp,
+      onSnapshot,
+      query,
+      orderBy,
+      doc,
+      getDocs
+    } from "https://www.gstatic.com/firebasejs/11.9.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyB_37ZZguKBELnNHACmfwegBRkvIkjc894",
+      authDomain: "mbbs-anonymous.firebaseapp.com",
+      projectId: "mbbs-anonymous",
+      storageBucket: "mbbs-anonymous.appspot.com",
+      messagingSenderId: "671524322752",
+      appId: "1:671524322752:web:7612b9de0e1c5b14d35c25"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const form = document.getElementById("msgForm");
+    const input = document.getElementById("msgInput");
+    const messagesDiv = document.getElementById("messages");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      await addDoc(collection(db, "publicWall"), {
+        text,
+        timestamp: serverTimestamp()
+      });
+      input.value = "";
+    });
+
+    const wallQuery = query(collection(db, "publicWall"), orderBy("timestamp", "desc"));
+    onSnapshot(wallQuery, async (snapshot) => {
+      messagesDiv.innerHTML = "";
+      for (const docSnap of snapshot.docs) {
+        const msg = docSnap.data();
+        const msgId = docSnap.id;
+
+        const msgDiv = document.createElement("div");
+        msgDiv.className = "message-box";
+
+        msgDiv.innerHTML = `
+          <div>${msg.text}</div>
+          <div class="time">🕒 ${timeAgo(msg.timestamp?.toDate?.() || new Date())}</div>
+          <div class="replies" id="replies-${msgId}"></div>
+          <form class="replyForm" data-id="${msgId}">
+            <input type="text" placeholder="Reply anonymously..." required />
+            <button type="submit">Reply 💬</button>
+          </form>
+        `;
+
+        messagesDiv.appendChild(msgDiv);
+
+        const replyForm = msgDiv.querySelector(".replyForm");
+        replyForm.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const replyInput = replyForm.querySelector("input");
+          const replyText = replyInput.value.trim();
+          if (!replyText) return;
+          await addDoc(collection(db, `publicWall/${msgId}/replies`), {
+            text: replyText,
+            timestamp: serverTimestamp()
+          });
+          replyInput.value = "";
+        });
+
+        const repliesQuery = query(collection(db, `publicWall/${msgId}/replies`), orderBy("timestamp", "asc"));
+        onSnapshot(repliesQuery, (replySnap) => {
+          const replyBox = msgDiv.querySelector(`#replies-${msgId}`);
+          replyBox.innerHTML = "";
+          replySnap.forEach(reply => {
+            const r = reply.data();
+            const replyDiv = document.createElement("div");
+            replyDiv.className = "reply";
+            replyDiv.innerHTML = `
+              <div>${r.text}</div>
+              <div class="time">⏱️ ${timeAgo(r.timestamp?.toDate?.() || new Date())}</div>
+            `;
+            replyBox.appendChild(replyDiv);
+          });
+        });
+      }
+    });
+
+    function timeAgo(date) {
+      const seconds = Math.floor((new Date() - date) / 1000);
+      if (seconds < 60) return \`\${seconds}s ago\`;
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return \`\${minutes}m ago\`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return \`\${hours}h ago\`;
+      return \`\${Math.floor(hours / 24)}d ago\`;
+    }
+  </script>
 </body>
 </html>
